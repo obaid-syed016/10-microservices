@@ -29,12 +29,22 @@ else {
 
 // Register GRPC OTel Instrumentation for trace propagation
 // regardless of whether tracing is emitted.
-const { GrpcInstrumentation } = require('@opentelemetry/instrumentation-grpc');
-const { registerInstrumentations } = require('@opentelemetry/instrumentation');
+let GrpcInstrumentation = null;
+let registerInstrumentations = null;
+try {
+  GrpcInstrumentation = require('@opentelemetry/instrumentation-grpc').GrpcInstrumentation;
+  registerInstrumentations = require('@opentelemetry/instrumentation').registerInstrumentations;
+} catch (e) {
+  // OpenTelemetry not installed; skip instrumentation
+  GrpcInstrumentation = null;
+  registerInstrumentations = function(){};
+}
 
-registerInstrumentations({
-  instrumentations: [new GrpcInstrumentation()]
-});
+if (GrpcInstrumentation) {
+  registerInstrumentations({
+    instrumentations: [new GrpcInstrumentation()]
+  });
+}
 
 if(process.env.ENABLE_TRACING == "1") {
   console.log("Tracing enabled.")

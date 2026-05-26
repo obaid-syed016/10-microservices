@@ -1,0 +1,41 @@
+name: CD
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push images
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+        run: |
+          set -e
+          echo "Building and pushing images for services with Dockerfile under src/"
+          for d in src/*; do
+            if [ -f "$d/Dockerfile" ]; then
+              svc=$(basename "$d")
+              image="$DOCKERHUB_USERNAME/${{ github.event.repository.name }}-$svc:latest"
+              echo "Building $svc -> $image"
+              docker build -t "$image" -f "$d/Dockerfile" "$d"
+              docker push "$image"
+              # also push a commit-specific tag
+              shaTag="$DOCKERHUB_USERNAME/${{ github.event.repository.name }}-$svc:${{ github.sha }}"
+              docker tag "$image" "$shaTag"
+              docker push "$shaTag"
+            fi
+          done

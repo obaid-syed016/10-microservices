@@ -65,8 +65,15 @@ def initStackdriverProfiling():
 
 class RecommendationService(demo_pb2_grpc.RecommendationServiceServicer):
     def ListRecommendations(self, request, context):
-        max_responses = 5
-        # fetch list of products from product catalog stub
+      max_responses = 5
+      # fetch list of products from product catalog stub (fallback to local list if unavailable)
+      if product_catalog_stub is None:
+        # fallback static product ids for local testing
+        product_ids = [
+          '0PUK6V6EV0', '1YMWWN1N4O', '2ZYFJ3GM2N', '66VCHSJNUP',
+          '6E92ZMYYFZ', '9SIQT8TOJO', 'L9ECAV7KIM', 'LS4PSXUNUM', 'OLJCESPC7Z'
+        ]
+      else:
         cat_response = product_catalog_stub.ListProducts(demo_pb2.Empty())
         product_ids = [x.id for x in cat_response.products]
         filtered_products = list(set(product_ids)-set(request.product_ids))
@@ -127,10 +134,12 @@ if __name__ == "__main__":
     port = os.environ.get('PORT', "8080")
     catalog_addr = os.environ.get('PRODUCT_CATALOG_SERVICE_ADDR', '')
     if catalog_addr == "":
-        raise Exception('PRODUCT_CATALOG_SERVICE_ADDR environment variable not set')
-    logger.info("product catalog address: " + catalog_addr)
-    channel = grpc.insecure_channel(catalog_addr)
-    product_catalog_stub = demo_pb2_grpc.ProductCatalogServiceStub(channel)
+      logger.info('PRODUCT_CATALOG_SERVICE_ADDR not set; using local fallback product list')
+      product_catalog_stub = None
+    else:
+      logger.info("product catalog address: " + catalog_addr)
+      channel = grpc.insecure_channel(catalog_addr)
+      product_catalog_stub = demo_pb2_grpc.ProductCatalogServiceStub(channel)
 
     # create gRPC server
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
